@@ -1,0 +1,19 @@
+.{
+    .name = .rchip_8,
+    .version = "0.0.0",
+    .fingerprint = 0xc64776d8fe62299a, // Changing this has security and trust implications.
+    .minimum_zig_version = "0.17.0-dev.292+fc1c83a36",
+    .dependencies = .{
+        .raylib = .{
+            .url = "https://github.com/raysan5/raylib/archive/refs/tags/6.0.tar.gz",
+            .hash = "raylib-6.0.0-whq8uCSwLgWWeF3ec3dbG6Rr36SLFL-s2WJ1Q_2E22Bb",
+        },
+    },
+    .paths = .{
+        "build.zig",
+        "build.zig.zon",
+        "src",
+        "LICENSE",
+        "README.md",
+    },
+}
