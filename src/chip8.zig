@@ -1,1 +1,1 @@
-pub const Chip8FrameBuffer = [64 * 32]u1;
+pub const Chip8 = struct {};

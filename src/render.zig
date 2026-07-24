@@ -6,12 +6,13 @@ const Color = rlb.Color;
 const Image = rlb.Image;
 const Texture = rlb.Texture2D;
 
-const DISPLAY_WIDTH = 64;
-const DISPLAY_HEIGHT = 32;
+const Types = @import("types.zig");
+const DISPLAY_WIDTH = Types.DISPLAY_WIDTH;
+const DISPLAY_HEIGHT = Types.DISPLAY_HEIGHT;
 const scale = 12;
 
-const MonochromaticFramebuffer = [DISPLAY_WIDTH * DISPLAY_HEIGHT]u1;
-const RGBAFrameBuffer = [DISPLAY_WIDTH * DISPLAY_HEIGHT]Color;
+const MonochromaticFramebuffer = Types.MonochromaticFramebuffer;
+const RGBAFrameBuffer = Types.RGBAFrameBuffer;
 
 pub const InitOptions = struct {
     screen_width: i32 = DISPLAY_WIDTH * scale,
