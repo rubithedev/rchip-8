@@ -21,6 +21,23 @@ pub fn build(b: *std.Build) void {
         }),
     });
 
+    const raylib = b.dependency("raylib", .{
+        .target = target,
+        .optimize = optimize,
+    });
+
+    mod.addImport("raylib", raylib.module("raylib"));
+
+    exe.root_module.addImport("raylib", raylib.module("raylib"));
+    exe.root_module.linkLibrary(raylib.artifact("raylib"));
+
+    exe.root_module.linkSystemLibrary("GL", .{});
+    exe.root_module.linkSystemLibrary("X11", .{});
+    exe.root_module.linkSystemLibrary("Xrandr", .{});
+    exe.root_module.linkSystemLibrary("Xinerama", .{});
+    exe.root_module.linkSystemLibrary("Xi", .{});
+    exe.root_module.linkSystemLibrary("Xcursor", .{});
+
     b.installArtifact(exe);
 
     const run_step = b.step("run", "Run the app");
