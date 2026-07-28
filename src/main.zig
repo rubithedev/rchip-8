@@ -1,57 +1,35 @@
 const std = @import("std");
 const Io = std.Io;
 
+const print = std.debug.print;
+
 const rchip_8 = @import("rchip_8");
 
-// This one is for testing only. Will remove.
-pub fn generateTestPattern() [64 * 32]u1 {
-    var fb: [64 * 32]u1 = @splat(0);
+pub fn main(init: std.process.Init) !void {
+    var render = rchip_8.RenderMod.Render.init(.{});
 
-    for (0..64) |x| {
-        fb[x] = 1;
-        fb[31 * 64 + x] = 1;
-    }
+    var cpu = rchip_8.Chip8Mod.Chip8.init();
 
-    for (0..32) |y| {
-        fb[y * 64] = 1;
-        fb[y * 64 + 63] = 1;
-    }
+    var cpu_clock = rchip_8.ClockMod.ChipClock.fromHz(500);
+    var timers_clock = rchip_8.ClockMod.ChipClock.fromHz(60);
 
-    for (8..16) |y| {
-        for (12..20) |x| {
-            fb[y * 64 + x] = 1;
-        }
-    }
-
-    for (8..16) |y| {
-        for (44..52) |x| {
-            fb[y * 64 + x] = 1;
-        }
-    }
-
-    for (22..26) |y| {
-        for (16..48) |x| {
-            fb[y * 64 + x] = 1;
-        }
-    }
-
-    for (20..22) |y| {
-        fb[y * 64 + 15] = 1;
-        fb[y * 64 + 48] = 1;
-    }
-
-    return fb;
-}
-
-pub fn main(_: std.process.Init) !void {
-    var render = rchip_8.RenderMod.Render.init(.{
-        .fg_color = .{ .r = 10, .g = 173, .b = 35, .a = 255 },
-    });
-
-    const test_framebuffer: [64 * 32]u1 = generateTestPattern();
+    var previous = std.Io.Clock.awake.now(init.io).toNanoseconds();
 
     while (!render.shouldClose()) {
-        render.draw(test_framebuffer);
+        const now = std.Io.Clock.awake.now(init.io).toNanoseconds();
+        const delta = now - previous;
+        previous = now;
+
+        cpu_clock.update(delta);
+        timers_clock.update(delta);
+
+        const cpu_ticks = cpu_clock.consume();
+        const timers_ticks = timers_clock.consume();
+
+        for (0..cpu_ticks) |_| cpu.step();
+        for (0..timers_ticks) |_| cpu.tickTimers();
+
+        render.draw(cpu.display_buffer);
     }
 
     render.deinit();
