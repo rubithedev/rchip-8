@@ -2,35 +2,30 @@ const std = @import("std");
 const time = std.time;
 const Io = std.Io;
 
+const print = std.debug.print;
+
 pub const ClockOptions = struct {
     clock_hz: u32 = 500, // 500Hz as default.
 };
 
 pub const ChipClock = struct {
-    clock_hz: u32,
-    period: i128,
+    period: i128 = 0,
     accumulator: i128 = 0,
 
-    pub fn init(options: ClockOptions) ChipClock {
-        var self = ChipClock{};
-
-        self.clock_hz = options.clock_hz;
-        self.period = time.ns_per_s / self.clock_hz;
-
-        return self;
+    pub fn fromHz(clock_hz: u32) ChipClock {
+        return ChipClock{
+            .period = time.ns_per_s / clock_hz,
+        };
     }
 
-    pub fn updateDelta(self: *ChipClock, delta_ns: i128) void {
+    pub fn update(self: *ChipClock, delta_ns: i128) void {
         self.accumulator += delta_ns;
     }
 
-    pub fn ready(self: *ChipClock) bool {
-        if (self.accumulator >= self.period) {
-            self.accumulator -= self.period;
+    pub fn consume(self: *ChipClock) u32 {
+        const ticks = @divTrunc(self.accumulator, self.period);
+        self.accumulator = @mod(self.accumulator, self.period);
 
-            return true;
-        }
-
-        return false;
+        return @intCast(ticks);
     }
 };
