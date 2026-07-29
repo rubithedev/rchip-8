@@ -8,7 +8,7 @@ const rchip_8 = @import("rchip_8");
 pub fn main(init: std.process.Init) !void {
     var render = rchip_8.RenderMod.Render.init(.{});
 
-    var cpu = rchip_8.Chip8Mod.Chip8.init();
+    var cpu = rchip_8.Chip8Mod.Chip8.init(init.io);
 
     var cpu_clock = rchip_8.ClockMod.ChipClock.fromHz(500);
     var timers_clock = rchip_8.ClockMod.ChipClock.fromHz(60);

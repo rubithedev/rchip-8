@@ -1,6 +1,7 @@
 const std = @import("std");
-
-const print = std.debug.print;
+const Io = std.Io;
+const Random = std.Random;
+const debug = std.debug;
 
 const Types = @import("types.zig");
 const MonochromaticFramebuffer = Types.MonochromaticFramebuffer;
@@ -78,11 +79,14 @@ pub const Chip8 = struct {
     /// Sound timer.
     sound_timer: Timer,
 
+    /// RNG.
+    random: Random.DefaultPrng,
+
     /// Flag to control the step in case the emulator encounters the `Fx0A`
     /// The Chip8 should stop the execution until the user press a key.
     wait_for_key: bool = false,
 
-    pub fn init() Chip8 {
+    pub fn init(io: Io) Chip8 {
         var self = Chip8{
             .display_buffer = @splat(0),
             .keyboard_buffer = @splat(0),
@@ -91,6 +95,7 @@ pub const Chip8 = struct {
             .v = @splat(0),
             .delay_timer = Timer{},
             .sound_timer = Timer{},
+            .random = Random.DefaultPrng.init(@intCast(Io.Clock.awake.now(io).toMicroseconds())),
         };
 
         // Load font sprites to interpreter memory. 0x000 to 0x1FF.
@@ -101,15 +106,18 @@ pub const Chip8 = struct {
             }
         }
 
+        debug.print("[Chip8]: Initialized!\n", .{});
         return self;
     }
 
     pub fn tickTimers(self: *Chip8) void {
+        debug.print("[Chip8]: Ticking timers\n", .{});
         self.delay_timer.tick();
         self.sound_timer.tick();
     }
 
     pub fn step(self: *Chip8) void {
+        debug.print("[Chip8]: Running step\n", .{});
         if (self.wait_for_key)
             return;
 
@@ -119,6 +127,8 @@ pub const Chip8 = struct {
 
     // Decoders.
     fn execute(self: *Chip8, opcode: u16) void {
+        debug.print("[Chip8]: Executing opcode: {x}\n", .{opcode});
+
         switch (opcode & 0xF000) {
             0x0 => self.decode0(opcode),
             0x1 => self.decode1(opcode),
@@ -150,16 +160,20 @@ pub const Chip8 = struct {
     }
 
     fn advancePc(self: *Chip8) void {
+        debug.print("[Chip8]: Advancing Program Counter (PC)\n", .{});
         self.pc += 2;
     }
 
     fn pushStack(self: *Chip8, value: u16) void {
+        debug.print("[Chip8]: Pushing stack {x}\n", .{value});
         self.stack[self.sp] = value;
         self.sp += 1;
     }
 
     fn popStack(self: *Chip8) u16 {
         self.sp -= 1;
+
+        debug.print("[Chip8]: Popping stack {x}\n", .{self.stack[self.sp]});
 
         return self.stack[self.sp];
     }
@@ -390,6 +404,7 @@ pub const Chip8 = struct {
 
     /// 0x00E0 instruction.
     fn opCLS(self: *Chip8) void {
+        debug.print("[Chip8] opCLS(): Clearing display\n", .{});
         self.display_buffer = @splat(0);
 
         self.advancePc();
@@ -398,132 +413,177 @@ pub const Chip8 = struct {
     /// 0x00EE instruction.
     fn opRET(self: *Chip8) void {
         self.pc = self.popStack();
+        debug.print("[Chip8] opRET(): Returning value from subroutine {x}\n", .{self.pc});
     }
 
     /// 0x0nnn instruction: `SYS addr`
     fn opSYS(self: *Chip8, addr: u16) void {
         // Doesn't do shit. I'm implementing it just in case.
         // Feel free to remove if you want.
+        debug.print("[Chip8] opSYS(): SYS operation to {x}. Doesn't do shit.\n", .{addr});
         _ = self;
-        _ = addr;
     }
 
     // 0x1 instructions.
 
     /// 0x1nnn instruction: `JP addr`
     fn opJP(self: *Chip8, addr: u16) void {
-        _ = self;
-        _ = addr;
-        // TODO: Implement.
+        debug.print("[Chip8] opJP(): JUMP to {x}\n", .{addr});
+        self.pc = addr;
     }
 
     // 0x2 instructions.
 
     /// 0x2nnn instruction: `CALL addr`
     fn opCALL(self: *Chip8, addr: u16) void {
-        _ = self;
-        _ = addr;
-        // TODO: Implement.
+        debug.print("[Chip8] opCALL(): CALL subroutine in {x}\n", .{addr});
+        self.pushStack(self.pc);
+        self.pc = addr;
     }
 
     // 0x3 instructions.
 
     /// 0x3xkk instruction: `SE Vx, byte`
     fn opSE(self: *Chip8, reg: u4, byte: u8) void {
-        _ = self;
-        _ = reg;
-        _ = byte;
-        // TODO: Implement.
+        debug.print("[Chip8] opSE(): Skipping next instruction V{} ({x}) if equal to {x}\n", .{
+            reg,
+            self.v[reg],
+            byte,
+        });
+        self.advancePc();
+
+        if (self.v[reg] == byte) {
+            self.advancePc();
+        }
     }
 
     // 0x4 instructions.
 
     /// 0x4xkk instruction: `SNE Vx, byte`
     fn opSNE(self: *Chip8, reg: u4, byte: u8) void {
-        _ = self;
-        _ = reg;
-        _ = byte;
-        // TODO: Implement.
+        debug.print("[Chip8] opSNE(): Skipping next instruction V{} ({x}) is not equal to {x}\n", .{
+            reg,
+            self.v[reg],
+            byte,
+        });
+        self.advancePc();
+
+        if (self.v[reg] != byte) {
+            self.advancePc();
+        }
     }
 
     // 0x5 instructions.
 
     /// 0x5xy0 instruction: `SE Vx, vy`
     fn opSEVxVy(self: *Chip8, reg_x: u4, reg_y: u4) void {
-        _ = self;
-        _ = reg_x;
-        _ = reg_y;
-        // TODO: Implement.
+        debug.print("[Chip8] opSEVxVy(): Skipping next instruction V{} ({x}) is not equal to V{} ({x})\n", .{
+            reg_x, self.v[reg_x],
+            reg_y, self.v[reg_y],
+        });
+        self.advancePc();
+
+        if (self.v[reg_x] == self.v[reg_y]) {
+            self.advancePc();
+        }
     }
 
     // 0x6 instructions.
 
     /// 0x6xkk instruction: `LD Vx, byte`
     fn opLD(self: *Chip8, reg: u4, byte: u8) void {
-        _ = self;
-        _ = reg;
-        _ = byte;
-        // TODO: Implement.
+        debug.print("[Chip8] opLD(): Loading {x} into V{}\n", .{ byte, reg });
+        self.v[reg] = byte;
+
+        self.advancePc();
     }
 
     // 0x7 instructions.
 
     /// 0x7xkk instruction: `ADD Vx, byte`
     fn opADD(self: *Chip8, reg: u4, byte: u8) void {
-        _ = self;
-        _ = reg;
-        _ = byte;
-        // TODO: Implement.
+        debug.print("[Chip8] opADD(): Adding {x} to V{} ({x})\n", .{
+            byte,
+            reg,
+            self.v[reg],
+        });
+        self.v[reg] += byte;
+
+        self.advancePc();
     }
 
     // 0x8 instructions.
 
     /// 0x8xy0 instruction: `LD Vx, Vy`
     fn opLDVxVy(self: *Chip8, reg_x: u4, reg_y: u4) void {
-        _ = self;
-        _ = reg_x;
-        _ = reg_y;
-        // TODO: Implement.
+        debug.print("[Chip8] opLDVxVy(): Loading to V{} ({x}) to V{} ({x})\n", .{
+            reg_x, self.v[reg_x],
+            reg_y, self.v[reg_y],
+        });
+        self.v[reg_x] = self.v[reg_y];
+
+        self.advancePc();
     }
 
     /// 0x8xy1 instruction: `OR Vx, Vy`
     fn opORVxVy(self: *Chip8, reg_x: u4, reg_y: u4) void {
-        _ = self;
-        _ = reg_x;
-        _ = reg_y;
-        // TODO: Implement.
+        debug.print("[Chip8] opORVxVy(): Executing bitwise OR with values V{} ({x}), V{} ({x})\n", .{
+            reg_x, self.v[reg_x],
+            reg_y, self.v[reg_y],
+        });
+        self.v[reg_x] |= self.v[reg_y];
+
+        self.advancePc();
     }
 
     /// 0x8xy2 instruction: `AND Vx, Vy`
     fn opANDVxVy(self: *Chip8, reg_x: u4, reg_y: u4) void {
-        _ = self;
-        _ = reg_x;
-        _ = reg_y;
-        // TODO: Implement.
+        debug.print("[Chip8] opANDVxVy(): Executing bitwise AND with values V{} ({x}), V{} ({x})\n", .{
+            reg_x, self.v[reg_x],
+            reg_y, self.v[reg_y],
+        });
+        self.v[reg_x] &= self.v[reg_y];
+
+        self.advancePc();
     }
 
     /// 0x8xy3 instuction: `XOR Vx, Vy`
     fn opXORVxVy(self: *Chip8, reg_x: u4, reg_y: u4) void {
-        _ = self;
-        _ = reg_x;
-        _ = reg_y;
-        // TODO: Implement.
+        debug.print("[Chip8] opXORVxVy(): Executing bitwise XOR with values V{} ({x}), V{} ({x})\n", .{
+            reg_x, self.v[reg_x],
+            reg_y, self.v[reg_y],
+        });
+        self.v[reg_x] ^= self.v[reg_y];
+
+        self.advancePc();
     }
 
     ///  0x8xy4 instruction: `ADD Vx, Vy`
     fn opADDVxVy(self: *Chip8, reg_x: u4, reg_y: u4) void {
-        _ = self;
-        _ = reg_x;
-        _ = reg_y;
-        // TODO: Implement.
+        debug.print("[Chip8] opADDVxVy(): ADD values V{} ({x}), V{} ({x}). VF receives the carry and Vx holds the last 8 significant bits.\n", .{
+            reg_x, self.v[reg_x],
+            reg_y, self.v[reg_y],
+        });
+
+        const sum = @as(u16, self.v[reg_x]) + @as(u16, self.v[reg_y]);
+
+        self.v[0xF] = if (sum > 0xFF) 1 else 0;
+        self.v[reg_x] = @truncate(sum);
+
+        self.advancePc();
     }
 
     /// 0x8xy5 instruction: `SUB Vx, Vy`
     fn opSUBVxVy(self: *Chip8, reg_x: u4, reg_y: u4) void {
-        _ = self;
-        _ = reg_x;
-        _ = reg_y;
-        // TODO: Implement.
+        debug.print("[Chip8] opSUBVxVy(): SUB values V{} ({x}), V{} ({x}). VF is set to 1 if Vx >= Vy (borrow)\n", .{
+            reg_x, self.v[reg_x],
+            reg_y, self.v[reg_y],
+        });
+        self.v[0xF] = if (self.v[reg_x] >= self.v[reg_y]) 1 else 0;
+
+        self.v[reg_x] -%= self.v[reg_y];
+
+        self.advancePc();
     }
 
     /// 0x8xy6 instruction: `SHR Vx {, Vy}`
@@ -536,10 +596,15 @@ pub const Chip8 = struct {
 
     //  0x8xy7 instruction: `SUBN Vx, Vy`
     fn opSUBNVxVy(self: *Chip8, reg_x: u4, reg_y: u4) void {
-        _ = self;
-        _ = reg_x;
-        _ = reg_y;
-        // TODO: Implement.
+        debug.print("[Chip8] opSUBNVxVy(): SUB values V{} ({x}), V{} ({x}). VF is set to 1 if Vx <= Vy (NOT borrow)\n", .{
+            reg_y, self.v[reg_y],
+            reg_x, self.v[reg_x],
+        });
+        self.v[0xF] = if (self.v[reg_y] >= self.v[reg_x]) 1 else 0;
+
+        self.v[reg_x] = self.v[reg_y] -% self.v[reg_x];
+
+        self.advancePc();
     }
 
     /// 0x8xyE instruction: `SHL Vx {, Vy}`
@@ -554,38 +619,46 @@ pub const Chip8 = struct {
 
     /// 0x9xy0 instruction: `SNE Vx, Vy`
     fn opSNEVxVy(self: *Chip8, reg_x: u4, reg_y: u4) void {
-        _ = self;
-        _ = reg_x;
-        _ = reg_y;
-        // TODO: Implement.
+        debug.print("[Chip8] opSNEVxVy(): Skipping next instruction V{} ({x}) if not equal to V{} ({x})\n", .{
+            reg_x, self.v[reg_x],
+            reg_y, self.v[reg_y],
+        });
+        self.advancePc();
+
+        if (self.v[reg_x] != self.v[reg_y]) {
+            self.advancePc();
+        }
     }
 
     // 0xA instructions.
 
     /// 0xAnnn instruction: `LD I, addr`
     fn opLDI(self: *Chip8, addr: u16) void {
-        _ = self;
-        _ = addr;
-        // TODO: Implement.
+        debug.print("[Chip8] opLDI(): Loads address {x} to I\n", .{addr});
+        self.I = addr;
+
+        self.advancePc();
     }
 
     // 0xB instructions.
 
     /// 0xBnnn instruction: `JP V0, addr`
     fn opJPV0(self: *Chip8, addr: u16) void {
-        _ = self;
-        _ = addr;
-        // TODO: Implement.
+        debug.print("[Chip8] opJPV0(): Jumps to V0 ({x}) + {x}\n", .{ self.v[0], addr });
+        self.pc = self.v[0] + addr;
     }
 
     // 0xC instructions.
 
     /// 0xCxkk instruction: `RND Vx, byte`
     fn opRNDVx(self: *Chip8, reg: u4, byte: u8) void {
-        _ = self;
-        _ = reg;
-        _ = byte;
-        // TODO: Implement.
+        debug.print("[Chip8] opRNDVx(): Generated random number and operates an AND with {x} and stores it in V{}\n", .{
+            byte, self.v[reg],
+        });
+        const rand_num = self.random.random().int(u8);
+        self.v[reg] = rand_num & byte;
+
+        self.advancePc();
     }
 
     // 0xD instructions.
