@@ -153,6 +153,17 @@ pub const Chip8 = struct {
         self.pc += 2;
     }
 
+    fn pushStack(self: *Chip8, value: u16) void {
+        self.stack[self.sp] = value;
+        self.sp += 1;
+    }
+
+    fn popStack(self: *Chip8) u16 {
+        self.sp -= 1;
+
+        return self.stack[self.sp];
+    }
+
     fn decode0(self: *Chip8, opcode: u16) void {
         switch (opcode & 0x00FF) {
             0xE0 => self.opCLS(),
@@ -380,12 +391,13 @@ pub const Chip8 = struct {
     /// 0x00E0 instruction.
     fn opCLS(self: *Chip8) void {
         self.display_buffer = @splat(0);
+
+        self.advancePc();
     }
 
     /// 0x00EE instruction.
     fn opRET(self: *Chip8) void {
-        _ = self;
-        // TODO: Implement.
+        self.pc = self.popStack();
     }
 
     /// 0x0nnn instruction: `SYS addr`
