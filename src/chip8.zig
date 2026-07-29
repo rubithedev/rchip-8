@@ -113,28 +113,29 @@ pub const Chip8 = struct {
         if (self.wait_for_key)
             return;
 
-        self.decodePC();
+        const opcode = self.fetchOpcode();
+        self.execute(opcode);
     }
 
     // Decoders.
-    fn decodePC(self: *Chip8) void {
-        switch (self.pc & 0xF000) {
-            0x0 => self.decode0(self.pc),
-            0x1 => self.decode1(self.pc),
-            0x2 => self.decode2(self.pc),
-            0x3 => self.decode3(self.pc),
-            0x4 => self.decode4(self.pc),
-            0x5 => self.decode5(self.pc),
-            0x6 => self.decode6(self.pc),
-            0x7 => self.decode7(self.pc),
-            0x8 => self.decode8(self.pc),
-            0x9 => self.decode9(self.pc),
-            0xA => self.decodeA(self.pc),
-            0xB => self.decodeB(self.pc),
-            0xC => self.decodeC(self.pc),
-            0xD => self.decodeD(self.pc),
-            0xE => self.decodeE(self.pc),
-            0xF => self.decodeF(self.pc),
+    fn execute(self: *Chip8, opcode: u16) void {
+        switch (opcode & 0xF000) {
+            0x0 => self.decode0(opcode),
+            0x1 => self.decode1(opcode),
+            0x2 => self.decode2(opcode),
+            0x3 => self.decode3(opcode),
+            0x4 => self.decode4(opcode),
+            0x5 => self.decode5(opcode),
+            0x6 => self.decode6(opcode),
+            0x7 => self.decode7(opcode),
+            0x8 => self.decode8(opcode),
+            0x9 => self.decode9(opcode),
+            0xA => self.decodeA(opcode),
+            0xB => self.decodeB(opcode),
+            0xC => self.decodeC(opcode),
+            0xD => self.decodeD(opcode),
+            0xE => self.decodeE(opcode),
+            0xF => self.decodeF(opcode),
 
             else => {},
         }
@@ -142,7 +143,13 @@ pub const Chip8 = struct {
 
     // Instructions.
 
-    fn nextInstruction(self: *Chip8) void {
+    fn fetchOpcode(self: *Chip8) u16 {
+        const pc: usize = @intCast(self.pc);
+
+        return (@as(u16, self.memory[pc]) << 8) | @as(u16, self.memory[pc + 1]);
+    }
+
+    fn advancePc(self: *Chip8) void {
         self.pc += 2;
     }
 
