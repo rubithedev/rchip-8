@@ -5,6 +5,24 @@ const print = std.debug.print;
 
 const rchip_8 = @import("rchip_8");
 
+const program: [26]u8 = .{
+    0xA0, 0x00, // LD I, 0x00
+    0x60, 0x18, // LD V0, 0x18
+    0x61, 0x0B, // LD V1, 0x0B
+    0x62, 0x05, // LD V2, 0x05
+    0x63, 0x00, // LD V3, 0x00
+
+    0x43, 0x0F, // SEN V3, 0x0F
+    0xA0, 0x00, // LD I, 0x00
+    0x43, 0x0F, // SEN V3, 0x0F
+    0x63, 0x00, // LD V3, 0x00
+
+    0xD0, 0x15, // DWR V0, V1, 0x5
+    0x73, 0x01, // ADD V3, 0x01
+    0xF2, 0x1E, // ADD I, V2
+    0x12, 0x0A, // JP 0x208
+};
+
 pub fn main(init: std.process.Init) !void {
     var render = rchip_8.RenderMod.Render.init(.{});
 
@@ -14,6 +32,8 @@ pub fn main(init: std.process.Init) !void {
     var timers_clock = rchip_8.ClockMod.ChipClock.fromHz(60);
 
     var previous = std.Io.Clock.awake.now(init.io).toNanoseconds();
+
+    cpu.loadToMemory(program[0..]);
 
     while (!render.shouldClose()) {
         const now = std.Io.Clock.awake.now(init.io).toNanoseconds();
