@@ -427,7 +427,10 @@ pub const Chip8 = struct {
             for (0..8) |j| {
 
                 // Holy FUCK. My brain is hurting... but it works. I guess...
-                const flat_display_index = (y + i) * 64 + x + j;
+                const normalized_y = if (y + j >= 32) 0 else y;
+                const normalized_x = if (x + i >= 64) 0 else x;
+
+                const flat_display_index = (normalized_y + i) * 64 + normalized_x + j;
                 const bit_index: u3 = @intCast(j);
                 const sprite_bit: u1 = @intCast((sprite_line >> (7 - bit_index)) & 1);
 
