@@ -5,6 +5,8 @@ const rlb = @import("raylib");
 const Color = rlb.Color;
 const Image = rlb.Image;
 const Texture = rlb.Texture2D;
+const Wave = rlb.Wave;
+const Sound = rlb.Sound;
 
 const Types = @import("types.zig");
 const DISPLAY_WIDTH = Types.DISPLAY_WIDTH;
@@ -15,6 +17,49 @@ pub const NO_REGISTER_KEYMAP = 0x1F;
 
 const MonochromaticFramebuffer = Types.MonochromaticFramebuffer;
 const RGBAFrameBuffer = Types.RGBAFrameBuffer;
+
+fn mono2RGBA(
+    framebuffer: MonochromaticFramebuffer,
+    rgba_framebuffer: *RGBAFrameBuffer,
+    fg_color: Color,
+    bg_color: Color,
+) void {
+    for (0..DISPLAY_HEIGHT) |y| {
+        for (0..DISPLAY_WIDTH) |x| {
+            const i = y * DISPLAY_WIDTH + x;
+            rgba_framebuffer[i] = if (framebuffer[i] == 1) fg_color else bg_color;
+        }
+    }
+}
+
+fn genSound() Sound {
+    // This one is a limitation of the Raylib sound implementation.
+    // But, at the same time, hard limiting the sound to 15 secs
+    // will make sure we don't get stuck with a sound playing forever
+    // in case of any bug;
+    const duration = 15;
+
+    const sample_rate = 44100;
+    const frequency = 440;
+    const total_samples = sample_rate * duration;
+    const half_wave = sample_rate / (frequency * 2);
+
+    var data: [total_samples]i16 = undefined;
+
+    for (0..total_samples) |i| {
+        data[i] = if ((i / half_wave) % 2 == 0) 1000 else -1000;
+    }
+
+    const wave = Wave{
+        .data = data.ptr,
+        .frameCount = total_samples,
+        .sampleRate = sample_rate,
+        .sampleSize = 16,
+        .channels = 1,
+    };
+
+    return rlb.LoadSoundFromWave(wave);
+}
 
 pub const InitOptions = struct {
     screen_width: i32 = DISPLAY_WIDTH * scale,
@@ -35,6 +80,7 @@ pub const Render = struct {
     framebuffer: RGBAFrameBuffer = undefined,
     keyboard_input: [16]u1,
     window_name: [:0]const u8,
+    buzzer_sound: Sound,
 
     pub fn init(options: InitOptions) Render {
         var self = Render{
@@ -45,12 +91,19 @@ pub const Render = struct {
             .fg_color = options.fg_color,
             .keyboard_input = @splat(0),
             .window_name = options.window_name,
+            .buzzer_sound = genSound(),
         };
 
         debug.print("[RENDER] init(): Init Window ({}, {}, '{s}')\n", .{ self.screen_width, self.screen_height, self.window_name });
+
+        // Window.
         rlb.InitWindow(self.screen_width, self.screen_height, self.window_name);
         rlb.SetTargetFPS(self.target_fps);
 
+        // Audio.
+        rlb.InitAudioDevice();
+
+        // Render texture.
         const image = rlb.GenImageColor(DISPLAY_WIDTH, DISPLAY_HEIGHT, self.bg_color);
         defer rlb.UnloadImage(image);
         self.texture = rlb.LoadTextureFromImage(image);
@@ -61,6 +114,7 @@ pub const Render = struct {
     pub fn deinit(self: *Render) void {
         debug.print("[RENDER] deinit(): Destroying render\n", .{});
         rlb.UnloadTexture(self.texture);
+        rlb.CloseAudioDevice();
         rlb.CloseWindow();
 
         self.* = undefined;
@@ -144,18 +198,12 @@ pub const Render = struct {
         }
         rlb.EndDrawing();
     }
-};
 
-fn mono2RGBA(
-    framebuffer: MonochromaticFramebuffer,
-    rgba_framebuffer: *RGBAFrameBuffer,
-    fg_color: Color,
-    bg_color: Color,
-) void {
-    for (0..DISPLAY_HEIGHT) |y| {
-        for (0..DISPLAY_WIDTH) |x| {
-            const i = y * DISPLAY_WIDTH + x;
-            rgba_framebuffer[i] = if (framebuffer[i] == 1) fg_color else bg_color;
-        }
+    pub fn playBuzzer(self: *Render) void {
+        rlb.PlaySound(self.buzzer_sound);
     }
-}
+
+    pub fn stopBuzzer(self: *Render) void {
+        rlb.StopSound(self.buzzer_sound);
+    }
+};
