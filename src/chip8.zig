@@ -129,8 +129,11 @@ pub const Chip8 = struct {
     }
 
     pub fn step(self: *Chip8) void {
-        if (self.wait_for_key or self.hard_lock)
-            return;
+        // Check for timers.
+        if (self.delay_timer.value > 0) return;
+
+        // Check for locks.
+        if (self.wait_for_key or self.hard_lock) return;
 
         const opcode = self.fetchOpcode();
         self.execute(opcode);
@@ -709,7 +712,6 @@ pub const Chip8 = struct {
         });
         const sprite = self.memory[self.I..(self.I + nibble)];
         self.writeDisplay(self.v[reg_x], self.v[reg_y], nibble, sprite);
-        debug.print("Set VF to {}\n", .{self.v[0xF]});
 
         self.advancePc();
     }
@@ -748,9 +750,13 @@ pub const Chip8 = struct {
 
     /// 0xFx15 instruction: `LD DT, Vx`
     fn opLDDTVx(self: *Chip8, reg: u4) void {
-        _ = self;
-        _ = reg;
-        // TODO: Implement.
+        debug.print("[Chip8] opLDDTVx(): Loading V{x} ({x}) to DT\n", .{
+            reg,
+            self.v[reg],
+        });
+        self.delay_timer.set(self.v[reg]);
+
+        self.advancePc();
     }
 
     /// 0xFx18 instruction: `LD ST, Vx`
