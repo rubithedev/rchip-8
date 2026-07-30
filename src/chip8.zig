@@ -86,6 +86,9 @@ pub const Chip8 = struct {
     /// The Chip8 should stop the execution until the user press a key.
     wait_for_key: bool = false,
 
+    /// Hard Locks the processor. No ticks or steps are executed.
+    hard_lock: bool = false,
+
     pub fn init(io: Io) Chip8 {
         var self = Chip8{
             .display_buffer = @splat(0),
@@ -110,15 +113,23 @@ pub const Chip8 = struct {
         return self;
     }
 
+    pub fn loadToMemory(self: *Chip8, block: []const u8) void {
+        for (block, 0..) |byte, i| {
+            self.memory[0x200 + i] = byte;
+        }
+    }
+
     pub fn tickTimers(self: *Chip8) void {
+        if (self.hard_lock)
+            return;
+
         debug.print("[Chip8]: Ticking timers\n", .{});
         self.delay_timer.tick();
         self.sound_timer.tick();
     }
 
     pub fn step(self: *Chip8) void {
-        debug.print("[Chip8]: Running step\n", .{});
-        if (self.wait_for_key)
+        if (self.wait_for_key or self.hard_lock)
             return;
 
         const opcode = self.fetchOpcode();
@@ -130,52 +141,25 @@ pub const Chip8 = struct {
         debug.print("[Chip8]: Executing opcode: {x}\n", .{opcode});
 
         switch (opcode & 0xF000) {
-            0x0 => self.decode0(opcode),
-            0x1 => self.decode1(opcode),
-            0x2 => self.decode2(opcode),
-            0x3 => self.decode3(opcode),
-            0x4 => self.decode4(opcode),
-            0x5 => self.decode5(opcode),
-            0x6 => self.decode6(opcode),
-            0x7 => self.decode7(opcode),
-            0x8 => self.decode8(opcode),
-            0x9 => self.decode9(opcode),
-            0xA => self.decodeA(opcode),
-            0xB => self.decodeB(opcode),
-            0xC => self.decodeC(opcode),
-            0xD => self.decodeD(opcode),
-            0xE => self.decodeE(opcode),
-            0xF => self.decodeF(opcode),
+            0x0000 => self.decode0(opcode),
+            0x1000 => self.decode1(opcode),
+            0x2000 => self.decode2(opcode),
+            0x3000 => self.decode3(opcode),
+            0x4000 => self.decode4(opcode),
+            0x5000 => self.decode5(opcode),
+            0x6000 => self.decode6(opcode),
+            0x7000 => self.decode7(opcode),
+            0x8000 => self.decode8(opcode),
+            0x9000 => self.decode9(opcode),
+            0xA000 => self.decodeA(opcode),
+            0xB000 => self.decodeB(opcode),
+            0xC000 => self.decodeC(opcode),
+            0xD000 => self.decodeD(opcode),
+            0xE000 => self.decodeE(opcode),
+            0xF000 => self.decodeF(opcode),
 
             else => {},
         }
-    }
-
-    // Instructions.
-
-    fn fetchOpcode(self: *Chip8) u16 {
-        const pc: usize = @intCast(self.pc);
-
-        return (@as(u16, self.memory[pc]) << 8) | @as(u16, self.memory[pc + 1]);
-    }
-
-    fn advancePc(self: *Chip8) void {
-        debug.print("[Chip8]: Advancing Program Counter (PC)\n", .{});
-        self.pc += 2;
-    }
-
-    fn pushStack(self: *Chip8, value: u16) void {
-        debug.print("[Chip8]: Pushing stack {x}\n", .{value});
-        self.stack[self.sp] = value;
-        self.sp += 1;
-    }
-
-    fn popStack(self: *Chip8) u16 {
-        self.sp -= 1;
-
-        debug.print("[Chip8]: Popping stack {x}\n", .{self.stack[self.sp]});
-
-        return self.stack[self.sp];
     }
 
     fn decode0(self: *Chip8, opcode: u16) void {
@@ -349,7 +333,7 @@ pub const Chip8 = struct {
     }
 
     fn decodeF(self: *Chip8, opcode: u16) void {
-        switch (opcode * 0xFF) {
+        switch (opcode & 0xFF) {
             0x07 => {
                 const reg = extractX(opcode);
 
@@ -372,7 +356,6 @@ pub const Chip8 = struct {
             },
             0x1E => {
                 const reg = extractX(opcode);
-
                 self.opADDIVx(reg);
             },
             0x29 => {
@@ -400,6 +383,58 @@ pub const Chip8 = struct {
         }
     }
 
+    // Instructions.
+
+    fn fetchOpcode(self: *Chip8) u16 {
+        const pc: usize = @intCast(self.pc);
+
+        return (@as(u16, self.memory[pc]) << 8) | @as(u16, self.memory[pc + 1]);
+    }
+
+    fn advancePc(self: *Chip8) void {
+        debug.print("[Chip8]: Advancing Program Counter (PC)\n", .{});
+        self.pc += 2;
+    }
+
+    fn pushStack(self: *Chip8, value: u16) void {
+        debug.print("[Chip8]: Pushing stack {x}\n", .{value});
+        self.stack[self.sp] = value;
+        self.sp += 1;
+    }
+
+    fn popStack(self: *Chip8) u16 {
+        self.sp -= 1;
+
+        debug.print("[Chip8]: Popping stack {x}\n", .{self.stack[self.sp]});
+
+        return self.stack[self.sp];
+    }
+
+    /// Writes data to the display in rows of 8xN bits.
+    fn writeDisplay(self: *Chip8, x: usize, y: usize, height: u4, block: []u8) void {
+        self.v[0xF] = 0;
+
+        for (0..height) |i| {
+            const sprite_line = block[i];
+
+            // TODO: Wrap around screen of sprites clip out of bounds.
+
+            for (0..8) |j| {
+
+                // Holy FUCK. My brain is hurting... but it works. I guess...
+                const flat_display_index = (y + i) * 64 + x + j;
+                const bit_index: u3 = @intCast(j);
+                const sprite_bit: u1 = @intCast((sprite_line >> (7 - bit_index)) & 1);
+
+                if ((self.v[0xF] == 0)) {
+                    if (self.display_buffer[flat_display_index] ^ sprite_bit == 1) self.v[0xF] = 1;
+                }
+
+                self.display_buffer[flat_display_index] = sprite_bit;
+            }
+        }
+    }
+
     // 0x0 instructions.
 
     /// 0x00E0 instruction.
@@ -421,7 +456,9 @@ pub const Chip8 = struct {
         // Doesn't do shit. I'm implementing it just in case.
         // Feel free to remove if you want.
         debug.print("[Chip8] opSYS(): SYS operation to {x}. Doesn't do shit.\n", .{addr});
-        _ = self;
+
+        // For debug proposes, 0x0000 opcode may hard lock the CPU.
+        self.hard_lock = true;
     }
 
     // 0x1 instructions.
@@ -665,11 +702,16 @@ pub const Chip8 = struct {
 
     /// 0xDxyn instruction: `DRW Vx, Vy, nibble`
     fn opDRWVxVy(self: *Chip8, reg_x: u4, reg_y: u4, nibble: u4) void {
-        _ = self;
-        _ = reg_x;
-        _ = reg_y;
-        _ = nibble;
-        // TODO: Implement.
+        debug.print("[Chip8] opDRWVxVy(): Drawing at coordinates [V{} ({x}), V{} ({x})] {} rows of 8 bits, starting at I ({x})\n", .{
+            reg_x,  self.v[reg_x],
+            reg_y,  self.v[reg_y],
+            nibble, self.I,
+        });
+        const sprite = self.memory[self.I..(self.I + nibble)];
+        self.writeDisplay(self.v[reg_x], self.v[reg_y], nibble, sprite);
+        debug.print("Set VF to {}\n", .{self.v[0xF]});
+
+        self.advancePc();
     }
 
     // 0xE instructions.
@@ -720,9 +762,12 @@ pub const Chip8 = struct {
 
     /// 0xFx1E instruction: `ADD I, Vx`
     fn opADDIVx(self: *Chip8, reg: u4) void {
-        _ = self;
-        _ = reg;
-        // TODO: Implement.
+        debug.print("[Chip8] opADDIVx(): ADD I ({x}), V{x}\n", .{
+            self.I, reg,
+        });
+        self.I += self.v[reg];
+
+        self.advancePc();
     }
 
     /// 0xFx29 instruction: `LD F, Vx`
