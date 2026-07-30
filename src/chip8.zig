@@ -86,6 +86,9 @@ pub const Chip8 = struct {
     /// The Chip8 should stop the execution until the user press a key.
     wait_for_key: bool = false,
 
+    /// Stores the last key pressed
+    key_pressed: u8 = 0,
+
     /// Hard Locks the processor. No ticks or steps are executed.
     hard_lock: bool = false,
 
@@ -395,7 +398,6 @@ pub const Chip8 = struct {
     }
 
     fn advancePc(self: *Chip8) void {
-        debug.print("[Chip8]: Advancing Program Counter (PC)\n", .{});
         self.pc += 2;
     }
 
@@ -436,6 +438,12 @@ pub const Chip8 = struct {
                 self.display_buffer[flat_display_index] = sprite_bit;
             }
         }
+    }
+
+    /// Pressed key event
+    fn pressedKey(self: *Chip8, key: u8) void {
+        debug.print("[Chip8] pressedKey(): Key read {x} \n", .{key});
+        self.key_pressed = key;
     }
 
     // 0x0 instructions.
@@ -772,10 +780,19 @@ pub const Chip8 = struct {
 
     /// 0xFx0A instruction: `LD Vx, K`
     fn opLDVxK(self: *Chip8, reg: u4) void {
-        _ = self;
-        _ = reg;
-        // TODO: Implement.
-        // Some shenanigans here.
+        debug.print("[Chip8] 0xFx0A(): Locking CPU until key pressed and stores it at V{x}\n", .{
+            reg,
+        });
+
+        if (!self.wait_for_key) {
+            self.wait_for_key = true;
+            return;
+        } else {
+            self.wait_for_key = false;
+            self.v[reg] = self.key_pressed;
+
+            self.advancePc();
+        }
     }
 
     /// 0xFx15 instruction: `LD DT, Vx`
