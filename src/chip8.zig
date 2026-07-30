@@ -587,7 +587,7 @@ pub const Chip8 = struct {
         self.advancePc();
     }
 
-    /// 0x8xy3 instuction: `XOR Vx, Vy`
+    /// 0x8xy3 instruction: `XOR Vx, Vy`
     fn opXORVxVy(self: *Chip8, reg_x: u4, reg_y: u4) void {
         debug.print("[Chip8] opXORVxVy(): Executing bitwise XOR with values V{} ({x}), V{} ({x})\n", .{
             reg_x, self.v[reg_x],
@@ -628,10 +628,16 @@ pub const Chip8 = struct {
 
     /// 0x8xy6 instruction: `SHR Vx {, Vy}`
     fn opSHRVx_Vy(self: *Chip8, reg_x: u4, reg_y: u4) void {
-        _ = self;
-        _ = reg_x;
-        _ = reg_y;
-        // TODO: Implement.
+        debug.print("[Chip8] opSHRVx_Vy(): V{x} ({x}) >> 1\n", .{
+            reg_x, self.v[reg_x],
+        });
+
+        _ = reg_y; // Used just in case we need to be absolutely compliant to the COSMAC VIP.
+
+        self.v[0xF] = self.v[reg_x] & 1;
+        self.v[reg_x] >>= 1;
+
+        self.advancePc();
     }
 
     //  0x8xy7 instruction: `SUBN Vx, Vy`
@@ -649,10 +655,16 @@ pub const Chip8 = struct {
 
     /// 0x8xyE instruction: `SHL Vx {, Vy}`
     fn opSHLVx_Vy(self: *Chip8, reg_x: u4, reg_y: u4) void {
-        _ = self;
-        _ = reg_x;
-        _ = reg_y;
-        // TODO: Implement.
+        debug.print("[Chip8] opSHLVx_Vy(): V{x} ({x}) << 1\n", .{
+            reg_x, self.v[reg_x],
+        });
+
+        _ = reg_y; // Used just in case we need to be absolutely compliant to the COSMAC VIP.
+
+        self.v[0xF] = (self.v[reg_x] >> 7) & 1;
+        self.v[reg_x] <<= 1;
+
+        self.advancePc();
     }
 
     // 0x9 instructions.
@@ -720,25 +732,42 @@ pub const Chip8 = struct {
 
     /// 0xEx9E instruction: SKP Vx
     fn opSKPVx(self: *Chip8, reg: u4) void {
-        _ = self;
-        _ = reg;
-        // TODO: Implement.
+        debug.print("[Chip8] opSKPVx(): Skips next instruction if key with V{x} ({x}) value is pressed\n", .{
+            reg, self.v[reg],
+        });
+
+        self.advancePc();
+
+        if (self.keyboard_buffer[self.v[reg]] == 1) {
+            self.advancePc();
+        }
     }
 
     /// 0xExA1 instruction: `SKNP Vx`
     fn opSKNPVx(self: *Chip8, reg: u4) void {
-        _ = self;
-        _ = reg;
-        // TODO: Implement.
+        debug.print("[Chip8] opSKNPVx(): Skips next instruction if key with V{x} ({x}) value is not pressed\n", .{
+            reg, self.v[reg],
+        });
+
+        self.advancePc();
+
+        if (self.keyboard_buffer[self.v[reg]] == 0) {
+            self.advancePc();
+        }
     }
 
     // 0xF instructions.
 
     /// 0xFx07 instruction: `LD Vx, DT`
     fn opLDVxDT(self: *Chip8, reg: u4) void {
-        _ = self;
-        _ = reg;
-        // TODO: Implement.
+        debug.print("[Chip8] opLDVxDT(): Loading DT ({x}) to V{x} ({x})\n", .{
+            self.delay_timer.value,
+            reg,
+            self.v[reg],
+        });
+        self.v[reg] = self.delay_timer.value;
+
+        self.advancePc();
     }
 
     /// 0xFx0A instruction: `LD Vx, K`
@@ -746,6 +775,7 @@ pub const Chip8 = struct {
         _ = self;
         _ = reg;
         // TODO: Implement.
+        // Some shenanigans here.
     }
 
     /// 0xFx15 instruction: `LD DT, Vx`
@@ -761,9 +791,13 @@ pub const Chip8 = struct {
 
     /// 0xFx18 instruction: `LD ST, Vx`
     fn opLDSTVx(self: *Chip8, reg: u4) void {
-        _ = self;
-        _ = reg;
-        // TODO: Implement.
+        debug.print("[Chip8] opLDSTVx(): Loading V{x} ({x}) to ST\n", .{
+            reg,
+            self.v[reg],
+        });
+        self.sound_timer.set(self.v[reg]);
+
+        self.advancePc();
     }
 
     /// 0xFx1E instruction: `ADD I, Vx`
@@ -778,30 +812,55 @@ pub const Chip8 = struct {
 
     /// 0xFx29 instruction: `LD F, Vx`
     fn opLDFVx(self: *Chip8, reg: u4) void {
-        _ = self;
-        _ = reg;
-        // TODO: Implement.
+        debug.print("[Chip8] opLDFVx(): Sets I to the digit sprite stored at V{x}\n", .{
+            reg,
+        });
+        self.I = self.v[reg] * 5;
+
+        self.advancePc();
     }
 
     /// 0xFx33 instruction: `LD B, Vx`
     fn opLDBVx(self: *Chip8, reg: u4) void {
-        _ = self;
-        _ = reg;
-        // TODO: Implement.
+        const value = self.v[reg];
+
+        const hundreds = value / 100;
+        const tens = (value / 10) % 10;
+        const ones = value % 10;
+
+        debug.print("[Chip8] opLDBVx(): Read V{x} as decimal ({}) (HTO) and writes I = H ({}), I+1 = T ({}), I+2 = O ({})\n", .{
+            reg,      self.v[reg],
+            hundreds, tens,
+            ones,
+        });
+
+        self.memory[self.I] = hundreds;
+        self.memory[self.I + 1] = tens;
+        self.memory[self.I + 2] = ones;
+
+        self.advancePc();
     }
 
     /// 0xFx55 instruction: `LD [I], Vx`
     fn opLDIVx(self: *Chip8, reg: u4) void {
-        _ = self;
-        _ = reg;
-        // TODO: Implement.
+        debug.print("[Chip8] opLDIVx(): Writing V0 to V{x} into memory starting from I ({x})\n", .{
+            reg, self.I,
+        });
+        const len: usize = @intCast(reg + 1);
+        @memcpy(self.memory[self.I..(self.I + len)], self.v[0..len]);
+
+        self.advancePc();
     }
 
     /// 0xFx65 instruction: `LD Vx, [I]`
     fn opLDVxI(self: *Chip8, reg: u4) void {
-        _ = self;
-        _ = reg;
-        // TODO: Implement.
+        debug.print("[Chip8] opLDVxI(): Loading values in I ({x}) from V0 to V{x}\n", .{
+            self.I, reg,
+        });
+        const len: usize = @intCast(reg + 1);
+        @memcpy(self.v[0..len], self.memory[self.I..(self.I + len)]);
+
+        self.advancePc();
     }
 };
 
