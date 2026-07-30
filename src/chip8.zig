@@ -422,8 +422,6 @@ pub const Chip8 = struct {
         for (0..height) |i| {
             const sprite_line = block[i];
 
-            // TODO: Wrap around screen of sprites clip out of bounds.
-
             for (0..8) |j| {
 
                 // Holy FUCK. My brain is hurting... but it works. I guess...
