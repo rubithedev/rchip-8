@@ -10,6 +10,10 @@ const Timer = @import("chip_timer.zig").ChipTimer;
 
 const NO_KEY_PRESSED = 0xFF;
 
+const Chip8Errors = error{
+    ROMTooBig,
+};
+
 // Bit extraction helpers.
 
 /// Extracts the NNN bits as in:
@@ -51,6 +55,9 @@ fn extractN(opcode: u16) u4 {
 }
 
 pub const Chip8 = struct {
+    /// For ROM loading and some random numbers generation.
+    io: Io,
+
     /// 64x32 monochromatic display buffer.
     display_buffer: MonochromaticFramebuffer,
 
@@ -96,6 +103,7 @@ pub const Chip8 = struct {
 
     pub fn init(io: Io) Chip8 {
         var self = Chip8{
+            .io = io,
             .display_buffer = @splat(0),
             .keyboard_buffer = @splat(0),
             .memory = @splat(0),
@@ -122,6 +130,18 @@ pub const Chip8 = struct {
         for (block, 0..) |byte, i| {
             self.memory[0x200 + i] = byte;
         }
+    }
+
+    pub fn loadFileToMemory(self: *Chip8, path: [:0]const u8) !void {
+        const cwd = Io.Dir.cwd();
+
+        // Max memory - program data start;
+        const max_rom_size = 4096 - 0x200;
+        var rom_data: [max_rom_size]u8 = @splat(0);
+        const content = try Io.Dir.readFile(cwd, self.io, path, &rom_data);
+        debug.print("[Chip8] loadFileToMemory(): Rom data: {any}\n", .{content});
+
+        @memcpy(self.memory[0x200..], rom_data[0..]);
     }
 
     pub fn tickTimers(self: *Chip8) void {
