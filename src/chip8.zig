@@ -446,19 +446,25 @@ pub const Chip8 = struct {
 
             for (0..8) |j| {
 
-                // Holy FUCK. My brain is hurting... but it works. I guess...
-                const normalized_y = if (y + j >= 32) 0 else y;
-                const normalized_x = if (x + i >= 64) 0 else x;
+                // These 2 lines disables the fucking warp around.
+                // Seems that some rooms only handle clipping.
+                // I will make it configurable though.
+                if (x + j >= 64) continue;
+                if (y + i >= 32) continue;
 
-                const flat_display_index = (normalized_y + i) * 64 + normalized_x + j;
+                const normalized_x = (x + j) % 64;
+                const normalized_y = (y + i) % 32;
+
+                const screen_index = normalized_y * 64 + normalized_x;
                 const bit_index: u3 = @intCast(j);
                 const sprite_bit: u1 = @intCast((sprite_line >> (7 - bit_index)) & 1);
 
+                const old_pixel = self.display_buffer[screen_index];
                 if ((self.v[0xF] == 0)) {
-                    if (self.display_buffer[flat_display_index] ^ sprite_bit == 1) self.v[0xF] = 1;
+                    if (old_pixel == 1 and sprite_bit == 1) self.v[0xF] = 1;
                 }
 
-                self.display_buffer[flat_display_index] = sprite_bit;
+                self.display_buffer[screen_index] = old_pixel ^ sprite_bit;
             }
         }
     }
@@ -484,6 +490,8 @@ pub const Chip8 = struct {
     fn opRET(self: *Chip8) void {
         self.pc = self.popStack();
         debug.print("[Chip8] opRET(): Returning value from subroutine {x}\n", .{self.pc});
+
+        self.advancePc();
     }
 
     /// 0x0nnn instruction: `SYS addr`
@@ -491,9 +499,7 @@ pub const Chip8 = struct {
         // Doesn't do shit. I'm implementing it just in case.
         // Feel free to remove if you want.
         debug.print("[Chip8] opSYS(): SYS operation to {x}. Doesn't do shit.\n", .{addr});
-
-        // For debug proposes, 0x0000 opcode may hard lock the CPU.
-        self.hard_lock = true;
+        self.advancePc();
     }
 
     // 0x1 instructions.
@@ -579,7 +585,7 @@ pub const Chip8 = struct {
             reg,
             self.v[reg],
         });
-        self.v[reg] += byte;
+        self.v[reg] +%= byte;
 
         self.advancePc();
     }
