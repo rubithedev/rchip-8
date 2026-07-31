@@ -33,16 +33,18 @@ const Clock = rchip_8.ClockMod.ChipClock;
 //     0x12, 0x0A, // JP 0x20A
 // };
 
-const program: [14]u8 = .{
+const program: [18]u8 = .{
     0xA0, 0x00, // LD I, 0x00
     0x60, 0x1E, // LD V0, 0x1E
     0x61, 0x0B, // LD V1, 0x0B
+    0x62, 0x0F, // LD V2, 0x0F
+    0xF2, 0x18, // LD ST, V2
 
     0xF3, 0x0A, // Locks this shit and grab a key
     0xF3, 0x29, // Sets key sprite to I
     0xD0, 0x15, // DWR V0, V1, 0x5
 
-    0x12, 0x06, // JP 0x20A
+    0x12, 0x0A, // JP 0x20A
 
 };
 
@@ -85,6 +87,12 @@ pub fn main(init: std.process.Init) !void {
         for (0..timers_ticks) |_| cpu.tickTimers();
 
         render.draw(cpu.display_buffer);
+
+        if (cpu.sound_timer.value > 0) {
+            render.playBuzzer();
+        } else {
+            render.stopBuzzer();
+        }
     }
 
     render.deinit();

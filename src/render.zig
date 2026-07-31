@@ -52,6 +52,7 @@ pub const Render = struct {
     keyboard_input: [16]u1,
     window_name: [:0]const u8,
     buzzer_sound: Sound = undefined,
+    buzzer_is_playing: bool = false,
 
     pub fn init(options: InitOptions) Render {
         var self = Render{
@@ -172,10 +173,16 @@ pub const Render = struct {
     }
 
     pub fn playBuzzer(self: *Render) void {
-        rlb.PlaySound(self.buzzer_sound);
+        if (!self.buzzer_is_playing) {
+            rlb.PlaySound(self.buzzer_sound);
+            self.buzzer_is_playing = true;
+        }
     }
 
     pub fn stopBuzzer(self: *Render) void {
-        rlb.StopSound(self.buzzer_sound);
+        if (self.buzzer_is_playing) {
+            rlb.StopSound(self.buzzer_sound);
+            self.buzzer_is_playing = false;
+        }
     }
 };
