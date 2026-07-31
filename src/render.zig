@@ -73,7 +73,11 @@ pub const Render = struct {
 
         // Audio.
         rlb.InitAudioDevice();
-        self.buzzer_sound = rlb.LoadSound("assets/buzzer.wav");
+
+        const buzzer_wave_data = @embedFile("buzzer_sound");
+        const wave = rlb.LoadWaveFromMemory(".wav", buzzer_wave_data.ptr, buzzer_wave_data.len);
+        defer rlb.UnloadWave(wave);
+        self.buzzer_sound = rlb.LoadSoundFromWave(wave);
 
         // Render texture.
         const image = rlb.GenImageColor(DISPLAY_WIDTH, DISPLAY_HEIGHT, self.bg_color);
