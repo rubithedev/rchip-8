@@ -9,6 +9,11 @@ pub fn build(b: *std.Build) void {
         .target = target,
     });
 
+    // Embed the buzzer sound.
+    mod.addAnonymousImport("buzzer_sound", .{
+        .root_source_file = b.path("assets/buzzer.wav"),
+    });
+
     const exe = b.addExecutable(.{
         .name = "rchip_8",
         .root_module = b.createModule(.{

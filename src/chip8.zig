@@ -8,6 +8,8 @@ const MonochromaticFramebuffer = Types.MonochromaticFramebuffer;
 
 const Timer = @import("chip_timer.zig").ChipTimer;
 
+const NO_KEY_PRESSED = 0xFF;
+
 // Bit extraction helpers.
 
 /// Extracts the NNN bits as in:
@@ -87,7 +89,7 @@ pub const Chip8 = struct {
     wait_for_key: bool = false,
 
     /// Stores the last key pressed
-    key_pressed: u8 = 0,
+    key_pressed: u8 = 0xFF,
 
     /// Hard Locks the processor. No ticks or steps are executed.
     hard_lock: bool = false,
@@ -442,9 +444,10 @@ pub const Chip8 = struct {
     }
 
     /// Pressed key event
-    fn pressedKey(self: *Chip8, key: u8) void {
+    pub fn pressedKey(self: *Chip8, key: u4) void {
         debug.print("[Chip8] pressedKey(): Key read {x} \n", .{key});
         self.key_pressed = key;
+        self.wait_for_key = false;
     }
 
     // 0x0 instructions.
@@ -494,7 +497,7 @@ pub const Chip8 = struct {
 
     /// 0x3xkk instruction: `SE Vx, byte`
     fn opSE(self: *Chip8, reg: u4, byte: u8) void {
-        debug.print("[Chip8] opSE(): Skipping next instruction V{} ({x}) if equal to {x}\n", .{
+        debug.print("[Chip8] opSE(): Skipping next instruction V{} (0x{X}) if equal to {x}\n", .{
             reg,
             self.v[reg],
             byte,
@@ -510,7 +513,7 @@ pub const Chip8 = struct {
 
     /// 0x4xkk instruction: `SNE Vx, byte`
     fn opSNE(self: *Chip8, reg: u4, byte: u8) void {
-        debug.print("[Chip8] opSNE(): Skipping next instruction V{} ({x}) is not equal to {x}\n", .{
+        debug.print("[Chip8] opSNE(): Skipping next instruction V{} (0x{X}) is not equal to {x}\n", .{
             reg,
             self.v[reg],
             byte,
@@ -526,7 +529,7 @@ pub const Chip8 = struct {
 
     /// 0x5xy0 instruction: `SE Vx, vy`
     fn opSEVxVy(self: *Chip8, reg_x: u4, reg_y: u4) void {
-        debug.print("[Chip8] opSEVxVy(): Skipping next instruction V{} ({x}) is not equal to V{} ({x})\n", .{
+        debug.print("[Chip8] opSEVxVy(): Skipping next instruction V{} (0x{X}) is not equal to V{} (0x{X})\n", .{
             reg_x, self.v[reg_x],
             reg_y, self.v[reg_y],
         });
@@ -551,7 +554,7 @@ pub const Chip8 = struct {
 
     /// 0x7xkk instruction: `ADD Vx, byte`
     fn opADD(self: *Chip8, reg: u4, byte: u8) void {
-        debug.print("[Chip8] opADD(): Adding {x} to V{} ({x})\n", .{
+        debug.print("[Chip8] opADD(): Adding {x} to V{} (0x{X})\n", .{
             byte,
             reg,
             self.v[reg],
@@ -565,7 +568,7 @@ pub const Chip8 = struct {
 
     /// 0x8xy0 instruction: `LD Vx, Vy`
     fn opLDVxVy(self: *Chip8, reg_x: u4, reg_y: u4) void {
-        debug.print("[Chip8] opLDVxVy(): Loading to V{} ({x}) to V{} ({x})\n", .{
+        debug.print("[Chip8] opLDVxVy(): Loading to V{} (0x{X}) to V{} (0x{X})\n", .{
             reg_x, self.v[reg_x],
             reg_y, self.v[reg_y],
         });
@@ -576,7 +579,7 @@ pub const Chip8 = struct {
 
     /// 0x8xy1 instruction: `OR Vx, Vy`
     fn opORVxVy(self: *Chip8, reg_x: u4, reg_y: u4) void {
-        debug.print("[Chip8] opORVxVy(): Executing bitwise OR with values V{} ({x}), V{} ({x})\n", .{
+        debug.print("[Chip8] opORVxVy(): Executing bitwise OR with values V{} (0x{X}), V{} (0x{X})\n", .{
             reg_x, self.v[reg_x],
             reg_y, self.v[reg_y],
         });
@@ -587,7 +590,7 @@ pub const Chip8 = struct {
 
     /// 0x8xy2 instruction: `AND Vx, Vy`
     fn opANDVxVy(self: *Chip8, reg_x: u4, reg_y: u4) void {
-        debug.print("[Chip8] opANDVxVy(): Executing bitwise AND with values V{} ({x}), V{} ({x})\n", .{
+        debug.print("[Chip8] opANDVxVy(): Executing bitwise AND with values V{} (0x{X}), V{} (0x{X})\n", .{
             reg_x, self.v[reg_x],
             reg_y, self.v[reg_y],
         });
@@ -598,7 +601,7 @@ pub const Chip8 = struct {
 
     /// 0x8xy3 instruction: `XOR Vx, Vy`
     fn opXORVxVy(self: *Chip8, reg_x: u4, reg_y: u4) void {
-        debug.print("[Chip8] opXORVxVy(): Executing bitwise XOR with values V{} ({x}), V{} ({x})\n", .{
+        debug.print("[Chip8] opXORVxVy(): Executing bitwise XOR with values V{} (0x{X}), V{} (0x{X})\n", .{
             reg_x, self.v[reg_x],
             reg_y, self.v[reg_y],
         });
@@ -609,7 +612,7 @@ pub const Chip8 = struct {
 
     ///  0x8xy4 instruction: `ADD Vx, Vy`
     fn opADDVxVy(self: *Chip8, reg_x: u4, reg_y: u4) void {
-        debug.print("[Chip8] opADDVxVy(): ADD values V{} ({x}), V{} ({x}). VF receives the carry and Vx holds the last 8 significant bits.\n", .{
+        debug.print("[Chip8] opADDVxVy(): ADD values V{} (0x{X}), V{} (0x{X}). VF receives the carry and Vx holds the last 8 significant bits.\n", .{
             reg_x, self.v[reg_x],
             reg_y, self.v[reg_y],
         });
@@ -624,7 +627,7 @@ pub const Chip8 = struct {
 
     /// 0x8xy5 instruction: `SUB Vx, Vy`
     fn opSUBVxVy(self: *Chip8, reg_x: u4, reg_y: u4) void {
-        debug.print("[Chip8] opSUBVxVy(): SUB values V{} ({x}), V{} ({x}). VF is set to 1 if Vx >= Vy (borrow)\n", .{
+        debug.print("[Chip8] opSUBVxVy(): SUB values V{} (0x{X}), V{} (0x{X}). VF is set to 1 if Vx >= Vy (borrow)\n", .{
             reg_x, self.v[reg_x],
             reg_y, self.v[reg_y],
         });
@@ -637,7 +640,7 @@ pub const Chip8 = struct {
 
     /// 0x8xy6 instruction: `SHR Vx {, Vy}`
     fn opSHRVx_Vy(self: *Chip8, reg_x: u4, reg_y: u4) void {
-        debug.print("[Chip8] opSHRVx_Vy(): V{x} ({x}) >> 1\n", .{
+        debug.print("[Chip8] opSHRVx_Vy(): V{x} (0x{X}) >> 1\n", .{
             reg_x, self.v[reg_x],
         });
 
@@ -651,7 +654,7 @@ pub const Chip8 = struct {
 
     //  0x8xy7 instruction: `SUBN Vx, Vy`
     fn opSUBNVxVy(self: *Chip8, reg_x: u4, reg_y: u4) void {
-        debug.print("[Chip8] opSUBNVxVy(): SUB values V{} ({x}), V{} ({x}). VF is set to 1 if Vx <= Vy (NOT borrow)\n", .{
+        debug.print("[Chip8] opSUBNVxVy(): SUB values V{} (0x{X}), V{} (0x{X}). VF is set to 1 if Vx <= Vy (NOT borrow)\n", .{
             reg_y, self.v[reg_y],
             reg_x, self.v[reg_x],
         });
@@ -664,7 +667,7 @@ pub const Chip8 = struct {
 
     /// 0x8xyE instruction: `SHL Vx {, Vy}`
     fn opSHLVx_Vy(self: *Chip8, reg_x: u4, reg_y: u4) void {
-        debug.print("[Chip8] opSHLVx_Vy(): V{x} ({x}) << 1\n", .{
+        debug.print("[Chip8] opSHLVx_Vy(): V{x} (0x{X}) << 1\n", .{
             reg_x, self.v[reg_x],
         });
 
@@ -680,7 +683,7 @@ pub const Chip8 = struct {
 
     /// 0x9xy0 instruction: `SNE Vx, Vy`
     fn opSNEVxVy(self: *Chip8, reg_x: u4, reg_y: u4) void {
-        debug.print("[Chip8] opSNEVxVy(): Skipping next instruction V{} ({x}) if not equal to V{} ({x})\n", .{
+        debug.print("[Chip8] opSNEVxVy(): Skipping next instruction V{} (0x{X}) if not equal to V{} (0x{X})\n", .{
             reg_x, self.v[reg_x],
             reg_y, self.v[reg_y],
         });
@@ -705,7 +708,7 @@ pub const Chip8 = struct {
 
     /// 0xBnnn instruction: `JP V0, addr`
     fn opJPV0(self: *Chip8, addr: u16) void {
-        debug.print("[Chip8] opJPV0(): Jumps to V0 ({x}) + {x}\n", .{ self.v[0], addr });
+        debug.print("[Chip8] opJPV0(): Jumps to V0 (0x{X}) + {x}\n", .{ self.v[0], addr });
         self.pc = self.v[0] + addr;
     }
 
@@ -726,7 +729,7 @@ pub const Chip8 = struct {
 
     /// 0xDxyn instruction: `DRW Vx, Vy, nibble`
     fn opDRWVxVy(self: *Chip8, reg_x: u4, reg_y: u4, nibble: u4) void {
-        debug.print("[Chip8] opDRWVxVy(): Drawing at coordinates [V{} ({x}), V{} ({x})] {} rows of 8 bits, starting at I ({x})\n", .{
+        debug.print("[Chip8] opDRWVxVy(): Drawing at coordinates [V{} (0x{X}), V{} (0x{X})] {} rows of 8 bits, starting at I (0x{X})\n", .{
             reg_x,  self.v[reg_x],
             reg_y,  self.v[reg_y],
             nibble, self.I,
@@ -741,7 +744,7 @@ pub const Chip8 = struct {
 
     /// 0xEx9E instruction: SKP Vx
     fn opSKPVx(self: *Chip8, reg: u4) void {
-        debug.print("[Chip8] opSKPVx(): Skips next instruction if key with V{x} ({x}) value is pressed\n", .{
+        debug.print("[Chip8] opSKPVx(): Skips next instruction if key with V{x} (0x{X}) value is pressed\n", .{
             reg, self.v[reg],
         });
 
@@ -754,7 +757,7 @@ pub const Chip8 = struct {
 
     /// 0xExA1 instruction: `SKNP Vx`
     fn opSKNPVx(self: *Chip8, reg: u4) void {
-        debug.print("[Chip8] opSKNPVx(): Skips next instruction if key with V{x} ({x}) value is not pressed\n", .{
+        debug.print("[Chip8] opSKNPVx(): Skips next instruction if key with V{x} (0x{X}) value is not pressed\n", .{
             reg, self.v[reg],
         });
 
@@ -769,7 +772,7 @@ pub const Chip8 = struct {
 
     /// 0xFx07 instruction: `LD Vx, DT`
     fn opLDVxDT(self: *Chip8, reg: u4) void {
-        debug.print("[Chip8] opLDVxDT(): Loading DT ({x}) to V{x} ({x})\n", .{
+        debug.print("[Chip8] opLDVxDT(): Loading DT (0x{X}) to V{x} (0x{X})\n", .{
             self.delay_timer.value,
             reg,
             self.v[reg],
@@ -785,12 +788,13 @@ pub const Chip8 = struct {
             reg,
         });
 
-        if (!self.wait_for_key) {
+        if (!self.wait_for_key and self.key_pressed == NO_KEY_PRESSED) {
             self.wait_for_key = true;
             return;
         } else {
             self.wait_for_key = false;
             self.v[reg] = self.key_pressed;
+            self.key_pressed = NO_KEY_PRESSED;
 
             self.advancePc();
         }
@@ -798,7 +802,7 @@ pub const Chip8 = struct {
 
     /// 0xFx15 instruction: `LD DT, Vx`
     fn opLDDTVx(self: *Chip8, reg: u4) void {
-        debug.print("[Chip8] opLDDTVx(): Loading V{x} ({x}) to DT\n", .{
+        debug.print("[Chip8] opLDDTVx(): Loading V{x} (0x{X}) to DT\n", .{
             reg,
             self.v[reg],
         });
@@ -809,7 +813,7 @@ pub const Chip8 = struct {
 
     /// 0xFx18 instruction: `LD ST, Vx`
     fn opLDSTVx(self: *Chip8, reg: u4) void {
-        debug.print("[Chip8] opLDSTVx(): Loading V{x} ({x}) to ST\n", .{
+        debug.print("[Chip8] opLDSTVx(): Loading V{x} (0x{X}) to ST\n", .{
             reg,
             self.v[reg],
         });
@@ -820,7 +824,7 @@ pub const Chip8 = struct {
 
     /// 0xFx1E instruction: `ADD I, Vx`
     fn opADDIVx(self: *Chip8, reg: u4) void {
-        debug.print("[Chip8] opADDIVx(): ADD I ({x}), V{x}\n", .{
+        debug.print("[Chip8] opADDIVx(): ADD I (0x{X}), V{x}\n", .{
             self.I, reg,
         });
         self.I += self.v[reg];
@@ -830,11 +834,10 @@ pub const Chip8 = struct {
 
     /// 0xFx29 instruction: `LD F, Vx`
     fn opLDFVx(self: *Chip8, reg: u4) void {
-        debug.print("[Chip8] opLDFVx(): Sets I to the digit sprite stored at V{x}\n", .{
-            reg,
+        debug.print("[Chip8] opLDFVx(): Sets I (0x{X}) to the digit sprite stored at V{x} (0x{X})\n", .{
+            self.I, reg, self.v[reg],
         });
         self.I = self.v[reg] * 5;
-
         self.advancePc();
     }
 
@@ -861,7 +864,7 @@ pub const Chip8 = struct {
 
     /// 0xFx55 instruction: `LD [I], Vx`
     fn opLDIVx(self: *Chip8, reg: u4) void {
-        debug.print("[Chip8] opLDIVx(): Writing V0 to V{x} into memory starting from I ({x})\n", .{
+        debug.print("[Chip8] opLDIVx(): Writing V0 to V{x} into memory starting from I (0x{X})\n", .{
             reg, self.I,
         });
         const len: usize = @intCast(reg + 1);
@@ -872,7 +875,7 @@ pub const Chip8 = struct {
 
     /// 0xFx65 instruction: `LD Vx, [I]`
     fn opLDVxI(self: *Chip8, reg: u4) void {
-        debug.print("[Chip8] opLDVxI(): Loading values in I ({x}) from V0 to V{x}\n", .{
+        debug.print("[Chip8] opLDVxI(): Loading values in I (0x{X}) from V0 to V{x}\n", .{
             self.I, reg,
         });
         const len: usize = @intCast(reg + 1);
