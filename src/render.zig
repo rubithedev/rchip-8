@@ -32,35 +32,6 @@ fn mono2RGBA(
     }
 }
 
-fn genSound() Sound {
-    // This one is a limitation of the Raylib sound implementation.
-    // But, at the same time, hard limiting the sound to 15 secs
-    // will make sure we don't get stuck with a sound playing forever
-    // in case of any bug;
-    const duration = 15;
-
-    const sample_rate = 44100;
-    const frequency = 440;
-    const total_samples = sample_rate * duration;
-    const half_wave = sample_rate / (frequency * 2);
-
-    var data: [total_samples]i16 = undefined;
-
-    for (0..total_samples) |i| {
-        data[i] = if ((i / half_wave) % 2 == 0) 1000 else -1000;
-    }
-
-    const wave = Wave{
-        .data = data.ptr,
-        .frameCount = total_samples,
-        .sampleRate = sample_rate,
-        .sampleSize = 16,
-        .channels = 1,
-    };
-
-    return rlb.LoadSoundFromWave(wave);
-}
-
 pub const InitOptions = struct {
     screen_width: i32 = DISPLAY_WIDTH * scale,
     screen_height: i32 = DISPLAY_HEIGHT * scale,
@@ -80,7 +51,7 @@ pub const Render = struct {
     framebuffer: RGBAFrameBuffer = undefined,
     keyboard_input: [16]u1,
     window_name: [:0]const u8,
-    buzzer_sound: Sound,
+    buzzer_sound: Sound = undefined,
 
     pub fn init(options: InitOptions) Render {
         var self = Render{
@@ -91,7 +62,6 @@ pub const Render = struct {
             .fg_color = options.fg_color,
             .keyboard_input = @splat(0),
             .window_name = options.window_name,
-            .buzzer_sound = genSound(),
         };
 
         debug.print("[RENDER] init(): Init Window ({}, {}, '{s}')\n", .{ self.screen_width, self.screen_height, self.window_name });
@@ -102,6 +72,7 @@ pub const Render = struct {
 
         // Audio.
         rlb.InitAudioDevice();
+        self.buzzer_sound = rlb.LoadSound("assets/buzzer.wav");
 
         // Render texture.
         const image = rlb.GenImageColor(DISPLAY_WIDTH, DISPLAY_HEIGHT, self.bg_color);
@@ -114,6 +85,7 @@ pub const Render = struct {
     pub fn deinit(self: *Render) void {
         debug.print("[RENDER] deinit(): Destroying render\n", .{});
         rlb.UnloadTexture(self.texture);
+        rlb.UnloadSound(self.buzzer_sound);
         rlb.CloseAudioDevice();
         rlb.CloseWindow();
 
