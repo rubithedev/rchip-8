@@ -30,7 +30,7 @@ pub fn main(init: std.process.Init) !void {
 }
 
 fn initMainLoop(render: *Render, cpu: *Chip8, io: Io) void {
-    var cpu_clock = Clock.fromHz(500);
+    var cpu_clock = Clock.fromHz(700);
     var timers_clock = Clock.fromHz(60);
 
     var previous = std.Io.Clock.awake.now(io).toNanoseconds();
@@ -46,6 +46,7 @@ fn initMainLoop(render: *Render, cpu: *Chip8, io: Io) void {
         const cpu_ticks = cpu_clock.consume();
         const timers_ticks = timers_clock.consume();
 
+        for (0..timers_ticks) |_| cpu.tickTimers();
         for (0..cpu_ticks) |_| {
             render.readKeyboard();
             @memcpy(cpu.keyboard_buffer[0..], render.keyboard_input[0..]);
@@ -58,8 +59,6 @@ fn initMainLoop(render: *Render, cpu: *Chip8, io: Io) void {
 
             cpu.step();
         }
-
-        for (0..timers_ticks) |_| cpu.tickTimers();
 
         render.draw(cpu.display_buffer);
 
