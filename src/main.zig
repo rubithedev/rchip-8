@@ -6,62 +6,37 @@ const debug = std.debug;
 const rchip_8 = @import("rchip_8");
 
 const Chip8 = rchip_8.Chip8Mod.Chip8;
-
 const RenderMod = rchip_8.RenderMod;
 const Render = RenderMod.Render;
+const Clock = rchip_8.ClockMod.ChipClock;
+const CLI = rchip_8.CLIMod.CLI;
+
 const NO_REGISTER_KEYMAP = RenderMod.NO_REGISTER_KEYMAP;
 
-const Clock = rchip_8.ClockMod.ChipClock;
-
-// const program: [30]u8 = .{
-//     0xA0, 0x00, // LD I, 0x00
-//     0x60, 0x1E, // LD V0, 0x1E
-//     0x61, 0x0B, // LD V1, 0x0B
-//     0x62, 0x05, // LD V2, 0x05
-//     0x63, 0x00, // LD V3, 0x00
-//     0x64, 0x2F, // LD V4, 0x2F
-
-//     0x43, 0x10, // SEN V3, 0x10
-//     0xA0, 0x00, // LD I, 0x00
-//     0x43, 0x10, // SEN V3, 0x10
-//     0x63, 0x00, // LD V3, 0x00
-
-//     0xD0, 0x15, // DWR V0, V1, 0x5
-//     0x73, 0x01, // ADD V3, 0x01
-//     0xF2, 0x1E, // ADD I, V2
-//     0xF4, 0x15, // LD DT, V4
-//     0x12, 0x0A, // JP 0x20A
-// };
-
-const program: [18]u8 = .{
-    0xA0, 0x00, // LD I, 0x00
-    0x60, 0x1E, // LD V0, 0x1E
-    0x61, 0x0B, // LD V1, 0x0B
-    0x62, 0x0F, // LD V2, 0x0F
-    0xF2, 0x18, // LD ST, V2
-
-    0xF3, 0x0A, // Locks this shit and grab a key
-    0xF3, 0x29, // Sets key sprite to I
-    0xD0, 0x15, // DWR V0, V1, 0x5
-
-    0x12, 0x0A, // JP 0x20A
-
-};
-
 pub fn main(init: std.process.Init) !void {
+    const arena_allocator = init.arena.allocator();
+
+    const args = try init.minimal.args.toSlice(arena_allocator);
+    const cli = try CLI.init(init.io, args);
+
     var render = Render.init(.{});
+    defer render.deinit();
 
     var cpu = Chip8.init(init.io);
 
+    try cpu.loadFileToMemory(cli.args.rom_path.?);
+
+    initMainLoop(&render, &cpu, init.io);
+}
+
+fn initMainLoop(render: *Render, cpu: *Chip8, io: Io) void {
     var cpu_clock = Clock.fromHz(500);
     var timers_clock = Clock.fromHz(60);
 
-    var previous = std.Io.Clock.awake.now(init.io).toNanoseconds();
-
-    cpu.loadToMemory(program[0..]);
+    var previous = std.Io.Clock.awake.now(io).toNanoseconds();
 
     while (!render.shouldClose()) {
-        const now = std.Io.Clock.awake.now(init.io).toNanoseconds();
+        const now = std.Io.Clock.awake.now(io).toNanoseconds();
         const delta = now - previous;
         previous = now;
 
@@ -94,6 +69,4 @@ pub fn main(init: std.process.Init) !void {
             render.stopBuzzer();
         }
     }
-
-    render.deinit();
 }
