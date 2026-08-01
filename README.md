@@ -12,7 +12,7 @@ All they had were 16 keys, from 0-F arranged in a grid. Most emulators map the k
 
 ![COSMAC VIP PC](https://upload.wikimedia.org/wikipedia/commons/6/63/RCA_Cosmac_VIP.jpg) ~~Look at that random ass keyboard layout 😭😭~~
 
-This emulator keeps a `1:1` mapping with actual keyboard, being even less ergonomic than both the original hardware and other emulation systems. But that is temporary and I'll add a global configuration that includes your preferred key mapping as well as some suggestions based on common choices for directional input in games.
+This emulator keeps a `1:1` mapping with your actual keyboard, being even less ergonomic than both the original hardware and other emulation systems. But that is temporary and I'll add a global configuration that includes your preferred key mapping as well as some suggestions based on common choices for directional input in games.
 
 ## Requirements
 
